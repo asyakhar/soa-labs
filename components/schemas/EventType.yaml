@@ -1,0 +1,6 @@
+type: string 
+enum:
+  - CONCERT
+  - BASKETBALL
+  - OPERA
+description: Вид событтия

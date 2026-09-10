@@ -1,0 +1,42 @@
+openapi: 3.0.3
+info: 
+  title: Ticket's buying and booking 
+  description: |
+    Спецификация веб-сервисов для управления покупки и бронировании билетов 
+  version: 1.0.0
+  contact: 
+    name: Nostya && Dasha
+servers: 
+  - url: /api/v1
+    description: Основной сервис управления коллекцией билетов 
+  - url: /booking 
+    description: Сервис бронирования и продажи билетов 
+paths: 
+  /tickets:
+    get: 
+      summary: Временно 
+      description: Today we gonna still the moon 
+      responses:
+        '200':
+          description: OK
+components:
+  schemas:
+    Event:
+      $ref: './components/schemas/Event.yaml'
+    Coordinates:
+      $ref: './components/schemas/Coordinates.yaml'
+    Ticket:
+      $ref: './components/schemas/Ticket.yaml'
+    TickeType:
+      $ref: './components/schemas/TicketType.yaml'
+    EventType:
+      $ref: './components/schemas/EventType.yaml'
+    ErrorResponse:
+      $ref: './components/schemas/ErrorResponse.yaml'
+  parameters:
+    page:
+      $ref: './components/parameters/Pagination.yaml#/page'
+    size:
+      $ref: './components/parameters/Pagination.yaml#/size'
+    sort:
+      $ref: './components/parameters/Pagination.yaml#/sort'

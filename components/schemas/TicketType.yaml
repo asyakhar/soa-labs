@@ -1,0 +1,7 @@
+type: string
+enum:
+  - VIP
+  - USUAL
+  - BUDGETARY
+  - CHEAP
+description: Тип билета 

@@ -1,0 +1,15 @@
+type: object
+properties:
+  x:
+    type: integer
+    format: int64
+    minimum: -238 
+    description: Координата X (> -239)
+  y:
+    type: number
+    format: float
+    minimum: -495
+    description: Координата Y (> -495)
+required:
+  - x
+  - y

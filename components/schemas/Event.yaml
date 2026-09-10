@@ -1,0 +1,37 @@
+type: object 
+properties:
+  id:
+    type: integer 
+    format: int64 
+    minimum: 1
+    readonly: true
+    description: Уникальный идентификатор продукта, должен быть >0
+  name:
+    type: string 
+    minLength: 1
+    description: Название продукта, не должен быть пустым
+  ticketsCount:
+    type: integer 
+    minimum: 1
+    nullable: true 
+    description: Цена указана, должна быть >0, если указана 
+  manufactureCost:
+    type: number
+    format: double
+    nullable: true 
+    description: Себестоимость производства 
+  unitOfMeasure: 
+    oneOf: 
+      - $ref: './UnitOfMeasure.yaml'
+      - type: 'null'
+  manufacturer:
+    $ref: './Organization.yaml'
+required: 
+  - id
+  - name
+  - coordinates 
+  - creationDate 
+  - manufacturer
+
+
+

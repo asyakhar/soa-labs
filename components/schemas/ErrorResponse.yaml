@@ -1,0 +1,17 @@
+type: object 
+properties:
+  timestamp:
+    type: string 
+    format: date-time 
+  status:
+    type: string 
+    decsription: Код ошибки 
+  error:
+    type: string 
+    decsription: Краткое название ошибки 
+  message: 
+    type: string 
+    decsription: Описание причины ошибки 
+required: 
+ - status
+ - message

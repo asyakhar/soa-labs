@@ -1,0 +1,26 @@
+page: 
+  name: page 
+  in: query 
+  description: Номер страницы 
+  required: false
+  schema: 
+    type: integer 
+    default: 0 
+    minimum: 0 
+size: 
+  name: size 
+  in: query 
+  description: Количество элементов на странице 
+  required: false
+  schema: 
+    type: integer 
+    default: 10 
+    minimum: 10 
+    maximum: 100
+sort: 
+  name: sort
+  in: query
+  description: "Сортировка в формате: (поле, направление)"
+  required: false
+  schema:
+    type: string
