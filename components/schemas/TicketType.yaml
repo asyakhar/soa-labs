@@ -1,7 +1,8 @@
 type: string
+nullable: true
+description: Тип билета
 enum:
   - VIP
   - USUAL
   - BUDGETARY
   - CHEAP
-description: Тип билета 

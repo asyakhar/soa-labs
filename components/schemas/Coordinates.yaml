@@ -1,14 +1,17 @@
 type: object
+description: Координаты билета
 properties:
   x:
-    type: integer
-    format: int64
-    minimum: -238 
+    type: number
+    format: double
+    minimum: -239
+    exclusiveMinimum: true
     description: Координата X (> -239)
   y:
-    type: number
-    format: float
+    type: integer
+    format: int64
     minimum: -495
+    exclusiveMinimum: true
     description: Координата Y (> -495)
 required:
   - x

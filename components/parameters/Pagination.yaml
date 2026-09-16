@@ -1,10 +1,11 @@
 page: 
   name: page 
-  in: query 
-  description: Номер страницы 
+  in: query
+  description: Номер запрашиваемой страницы. Нумерация начинается с 0
   required: false
   schema: 
-    type: integer 
+    type: integer
+    format: int32
     default: 0 
     minimum: 0 
 size: 
@@ -13,14 +14,29 @@ size:
   description: Количество элементов на странице 
   required: false
   schema: 
-    type: integer 
+    type: integer
+    format: int32
     default: 10 
-    minimum: 10 
+    minimum: 1
     maximum: 100
 sort: 
   name: sort
   in: query
   description: "Сортировка в формате: (поле, направление)"
   required: false
+  style: form
   schema:
-    type: string
+    type: array
+    items:
+        type: string
+filter:
+  name: filter
+  in: query
+  required: false
+  description: "Условия фильтрации в формате: (поле:оператор:значение)"
+  style: form
+  explode: true
+  schema:
+      type: array
+      items:
+        type: string

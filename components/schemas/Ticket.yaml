@@ -1,42 +1,54 @@
-type: object 
+type: object
+description: Билет
 properties:
   id:
     type: integer
-    format: int64 
-    minimum: 1 
-    readonly: true 
-    description: Уникальный ID билета
-  name: 
-    type: string 
-    minlength: 1
-    description: Название билета
-  coordinates:
-    ref$: './Coordinates.yaml'
-  creationDate:
-    type: string 
-    format: date-time
-    readonly: true
-    description: Дата создания 
-  price:
-    type: integer
-    format: int64 
+    format: int64
     minimum: 1
-    description: Цена билета
-  comment: 
+    readOnly: true
+    description: Уникальный автоматически генерируемый идентификатор билета
+    example: 10
+
+  name:
     type: string
     minLength: 1
-    description: Комментарий к билету
-  type: 
-    - $ref: './TicketType.yaml'
+    description: Название билета. Строка не может быть пустой
+    example: Билет в партер
+
+  coordinates:
+    $ref: './Coordinates.yaml'
+
+  creationDate:
+    type: string
+    format: date
+    readOnly: true
+    description: Автоматически генерируемая дата создания билета
+    example: '2026-09-16'
+
+  price:
+    type: number
+    format: double
+    minimum: 0
+    exclusiveMinimum: true
+    description: Цена билета. Значение должно быть больше 0
+    example: 2500.50
+
+  comment:
+    type: string
+    description: Комментарий к билету. Поле не может быть null
+    example: Место рядом со сценой
+
+  type:
+    $ref: './TicketType.yaml'
+
   event:
-    oneOf: 
-      - $ref: './Event.yaml'
-      - type: 'null'
+    $ref: './Event.yaml'
+
 required:
-   - id
-   - name 
-   - coordinates 
-   - creationDate 
-   - price 
-   - comment
-   - type
+  - id
+  - name
+  - coordinates
+  - creationDate
+  - price
+  - comment
+  - type

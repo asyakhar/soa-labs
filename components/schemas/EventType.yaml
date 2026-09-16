@@ -1,6 +1,7 @@
-type: string 
+type: string
+nullable: true
+description: Тип мероприятия
 enum:
   - CONCERT
   - BASKETBALL
   - OPERA
-description: Вид событтия

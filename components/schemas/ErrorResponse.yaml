@@ -1,17 +1,26 @@
-type: object 
+type: object
+description: Информация об ошибке выполнения запроса
 properties:
   timestamp:
-    type: string 
-    format: date-time 
+    type: string
+    format: date-time
+    description: Дата и время возникновения ошибки
   status:
-    type: string 
-    decsription: Код ошибки 
+    type: integer
+    format: int32
+    description: HTTP-код ошибки
   error:
-    type: string 
-    decsription: Краткое название ошибки 
-  message: 
-    type: string 
-    decsription: Описание причины ошибки 
-required: 
- - status
- - message
+    type: string
+    description: Краткое название ошибки
+  message:
+    type: string
+    description: Подробное описание причины ошибки
+  path:
+      type: string
+      description: URL запроса, при обработке которого произошла ошибка
+required:
+  - timestamp
+  - status
+  - message
+  - error
+  - path
