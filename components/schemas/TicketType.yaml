@@ -1,6 +1,5 @@
 type: string
-nullable: true
-description: Тип билета
+description: "Тип билета. Порядок сравнения: VIP < USUAL < BUDGETARY < CHEAP"
 enum:
   - VIP
   - USUAL

@@ -2,7 +2,16 @@ openapi: 3.0.3
 info:
   title: Сервис управления и продажи билетов
   description: |
-    Спецификация веб-сервисов для управления покупки и бронировании билетов 
+    Спецификация двух веб-сервисов: управление коллекцией билетов и бронирование.
+    Все входные данные передаются в URL. Для POST и PUT объект Ticket передаётся
+    как JSON в query-параметре `ticket`, с percent-encoding значения.
+    Тела запросов не используются; объекты в ответах представлены в application/json.
+    Это буквальное толкование требования лабораторной; в обычном API для создания
+    и обновления больших объектов предпочтительно JSON-тело запроса.
+    Поля id, creationDate и event.id генерирует сервер; клиент их не передаёт.
+    Связь ticket-id → person-id хранится внутри сервиса бронирования,
+    поскольку исходный класс Ticket не содержит person-id.
+    Здесь опубликована спецификация, а не реализация сервисов.
   version: 1.0.0
   contact: 
     name: Nostya && Dasha
@@ -50,13 +59,8 @@ paths:
       summary: Добавить новый билет
       description: Создаёт новый объект Ticket и добавляет его в коллекцию
       operationId: createTicket
-      requestBody:
-        required: true
-        description: Данные нового билета в формате JSON
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Ticket'
+      parameters:
+        - $ref: '#/components/parameters/ticket'
       responses:
         '201':
           description: Билет успешно создан
@@ -65,7 +69,6 @@ paths:
               description: URL созданного билета
               schema:
                 type: string
-                format: uri
               example: /api/v1/tickets/10
           content:
             application/json:
@@ -73,7 +76,7 @@ paths:
                 $ref: '#/components/schemas/Ticket'
 
         '400':
-          description: Тело запроса отсутствует или содержит некорректный JSON
+          description: Параметр ticket отсутствует или содержит некорректный JSON
           content:
             application/json:
               schema:
@@ -130,15 +133,13 @@ paths:
         - Tickets
       summary: Обновить билет
       description: |
-        Полностью обновляет билет с указанным идентификатором
+        Полностью обновляет изменяемые поля билета с указанным идентификатором.
+        id и creationDate сохраняются. Если поля event совпадают с текущими,
+        event.id сохраняется; иначе сервер создаёт мероприятие с новым event.id.
+        Если event отсутствует или равен null, связь удаляется.
       operationId: updateTicket
-      requestBody:
-        required: true
-        description: Новые данные билета в формате JSON
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Ticket'
+      parameters:
+        - $ref: '#/components/parameters/ticket'
 
       responses:
         '200':
@@ -300,6 +301,12 @@ paths:
       summary: Продать билет
       description: |
         Продаёт указанный билет указанному человеку за переданную сумму.
+        Получает билет через GET /api/v1/tickets/{id} и обновляет его price через
+        PUT /api/v1/tickets/{id}, передавая изменяемые поля в параметре ticket.
+        После успешного обновления сохраняет внутреннюю связь ticket-id → person-id.
+        Сбой первого сервиса не должен оставлять новое бронирование.
+        Если билет уже связан с человеком, возвращается 409, включая повторную продажу
+        тому же человеку. Неизменённое вложенное event сохраняет свой id.
       operationId: sellTicket
       parameters:
         - name: ticket-id
@@ -352,7 +359,7 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
 
         '409':
-          description: Билет уже продан другому человеку
+          description: Билет уже продан
           content:
             application/json:
               schema:
@@ -374,7 +381,12 @@ paths:
         - Booking
       summary: Отменить все бронирования человека
       description: |
-        Отменяет все бронирования указанного человека
+        Отменяет все бронирования указанного человека.
+        Получает коллекцию через GET /api/v1/tickets (последовательно по страницам)
+        и удаляет все внутренние связи с данным person-id, включая связи удалённых билетов.
+        Сами билеты и их price сохраняются. Поле person-id в JSON Ticket не добавляется.
+        При сбое первого сервиса связи сохраняются, возвращается 502.
+        Повторная отмена и отсутствие бронирований возвращают 204.
       operationId: cancelPersonBookings
       parameters:
         - name: person-id
@@ -418,6 +430,26 @@ components:
       $ref: './components/schemas/ErrorResponse.yaml'
 
   parameters:
+    ticket:
+      name: ticket
+      in: query
+      required: true
+      description: |
+        JSON-объект с изменяемыми полями Ticket, закодированный в URL.
+        id, creationDate и event.id не передаются (генерируются сервером).
+        event может отсутствовать или быть null. Все остальные изменяемые поля обязательны.
+        Swagger UI сериализует JSON и кодирует значение параметра автоматически.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Ticket'
+          example:
+            name: Билет в партер
+            coordinates: {x: 10.5, y: 20}
+            price: 2500.5
+            comment: Место рядом со сценой
+            type: VIP
+            event: null
     page:
       $ref: './components/parameters/Pagination.yaml#/page'
     size:

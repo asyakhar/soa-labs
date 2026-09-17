@@ -1,42 +1,88 @@
-page: 
-  name: page 
+page:
+  name: page
   in: query
-  description: Номер запрашиваемой страницы. Нумерация начинается с 0
+  description: Номер страницы с 0. Фильтрация и сортировка выполняются до пагинации. За пределами выборки возвращается пустой массив.
   required: false
-  schema: 
+  schema:
     type: integer
     format: int32
-    default: 0 
-    minimum: 0 
-size: 
-  name: size 
-  in: query 
-  description: Количество элементов на странице 
+    default: 0
+    minimum: 0
+size:
+  name: size
+  in: query
+  description: Максимальное количество элементов на странице.
   required: false
-  schema: 
+  schema:
     type: integer
     format: int32
-    default: 10 
+    default: 10
     minimum: 1
     maximum: 100
-sort: 
+sort:
   name: sort
   in: query
-  description: "Сортировка в формате: (поле, направление)"
+  description: |
+    Один критерий имеет формат `поле,asc` или `поле,desc` (направление обязательно).
+    Несколько критериев передаются повторением параметра:
+    `?sort=price,desc&sort=name,asc`. Приоритет соответствует порядку параметров.
+    Поддерживаются все поля Ticket: id, name, coordinates, creationDate, price,
+    comment, type, event; вложенные поля задаются через точку:
+    coordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.
+    coordinates сравнивается по (x, y), event — по (id, name, ticketsCount, eventType).
+    Числа сравниваются численно, строки — по Unicode с учётом регистра,
+    creationDate — хронологически. Перечисления сравниваются в порядке объявления:
+    VIP < USUAL < BUDGETARY < CHEAP; CONCERT < BASKETBALL < OPERA.
+    null и отсутствующие необязательные поля всегда идут последними.
+    Без sort используется id,asc; при равенстве критериев id,asc служит последним
+    критерием для устойчивой пагинации при неизменной коллекции.
+    Неизвестное поле, неверное направление или повтор одного поля — HTTP 400.
+    Примеры здесь показаны до percent-encoding URL.
   required: false
   style: form
+  explode: true
   schema:
     type: array
+    minItems: 1
     items:
-        type: string
+      type: string
+  examples:
+    multiple:
+      summary: Сначала цена по убыванию, затем название
+      value: ['price,desc', 'name,asc']
 filter:
   name: filter
   in: query
   required: false
-  description: "Условия фильтрации в формате: (поле:оператор:значение)"
+  description: |
+    Условие имеет формат `поле:оператор:значение`. Первые два двоеточия — разделители;
+    оставшаяся часть целиком является значением (включая двоеточия в дате или тексте).
+    Несколько условий передаются повторением filter и объединяются через AND:
+    `?filter=price:gte:100&filter=price:lt:500&filter=event.eventType:eq:CONCERT`.
+    Можно повторять одно поле и сочетать filter с любыми sort, page и size.
+    Поля: id, name, coordinates, creationDate, price, comment, type, event,
+    coordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.
+    Операторы eq, ne доступны для всех полей; gt, gte, lt, lte — для чисел,
+    creationDate и перечислений; contains — для name, comment и event.name;
+    isnull — для event и event.eventType, значение true или false.
+    Примеры: `filter=comment:contains:сцена`, `filter=event:isnull:true`,
+    `filter=creationDate:gte:2026-09-01T00:00:00`.
+    Числа записываются с точкой, даты — локальные ISO 8601 без часового пояса,
+    enum — одним из объявленных имён; порядок enum такой же, как для sort.
+    Строки сравниваются с учётом регистра, contains ищет буквальную подстроку.
+    Для coordinates и event операторы eq/ne принимают JSON-объект и сравнивают
+    его структурно со всем объектом; для event также допустим JSON null.
+    Для event.eventType допустимо значение null с eq/ne.
+    Отсутствующее event считается null; вложенные поля отсутствующего event также null.
+    Сравнения с null, кроме eq/ne/isnull, дают false.
+    Значения кодируются percent-encoding при передаче в URL; строка после второго
+    двоеточия не обрезается. Неизвестное поле, оператор, несовместимый тип значения
+    или некорректный синтаксис приводят к HTTP 400. Нет совпадений — HTTP 200 и [].
   style: form
   explode: true
   schema:
-      type: array
-      items:
-        type: string
+    type: array
+    minItems: 1
+    items:
+      type: string
+  example: ['price:gte:100', 'type:gt:USUAL']

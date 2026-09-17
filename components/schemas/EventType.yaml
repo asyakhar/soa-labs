@@ -5,3 +5,4 @@ enum:
   - CONCERT
   - BASKETBALL
   - OPERA
+  - null

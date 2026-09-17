@@ -1,0 +1,7 @@
+extends:
+  - recommended
+rules:
+  # Учебный API публичный; аутентификация не предусмотрена заданием.
+  security-defined: off
+  # Лицензия на сам API в задании не определена.
+  info-license: off

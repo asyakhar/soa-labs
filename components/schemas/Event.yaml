@@ -7,7 +7,7 @@ properties:
     format: int64 
     minimum: 1
     readOnly: true
-    description: Уникальный идентификатор продукта, должен быть >0
+    description: Уникальный автоматически генерируемый идентификатор мероприятия, должен быть >0
   name:
     type: string 
     minLength: 1

@@ -1,0 +1,831 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Сервис управления и продажи билетов",
+    "description": "Спецификация двух веб-сервисов: управление коллекцией билетов и бронирование.\nВсе входные данные передаются в URL. Для POST и PUT объект Ticket передаётся\nкак JSON в query-параметре `ticket`, с percent-encoding значения.\nТела запросов не используются; объекты в ответах представлены в application/json.\nЭто буквальное толкование требования лабораторной; в обычном API для создания\nи обновления больших объектов предпочтительно JSON-тело запроса.\nПоля id, creationDate и event.id генерирует сервер; клиент их не передаёт.\nСвязь ticket-id → person-id хранится внутри сервиса бронирования,\nпоскольку исходный класс Ticket не содержит person-id.\nЗдесь опубликована спецификация, а не реализация сервисов.\n",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Nostya && Dasha"
+    }
+  },
+  "servers": [
+    {
+      "url": "/api/v1",
+      "description": "Основной сервис управления коллекцией билетов"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Tickets",
+      "description": "Базовые операции над коллекцией билетов"
+    },
+    {
+      "name": "Ticket queries",
+      "description": "Специальные операции выборки билетов"
+    },
+    {
+      "name": "Booking",
+      "description": "Продажа билетов и отмена бронирований"
+    }
+  ],
+  "paths": {
+    "/tickets": {
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Получить список билетов",
+        "description": "Возвращает массив билетов",
+        "operationId": "getTickets",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/page"
+          },
+          {
+            "$ref": "#/components/parameters/size"
+          },
+          {
+            "$ref": "#/components/parameters/sort"
+          },
+          {
+            "$ref": "#/components/parameters/filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Массив билетов успешно получен",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Некорректные параметры пагинации, сортировки или фильтрации",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Добавить новый билет",
+        "description": "Создаёт новый объект Ticket и добавляет его в коллекцию",
+        "operationId": "createTicket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ticket"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Билет успешно создан",
+            "headers": {
+              "Location": {
+                "description": "URL созданного билета",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "/api/v1/tickets/10"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Параметр ticket отсутствует или содержит некорректный JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Данные нарушают ограничения целостности объекта Ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Уникальный идентификатор билета",
+          "schema": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "example": 10
+        }
+      ],
+      "get": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Получить билет по идентификатору",
+        "description": "Возвращает объект Ticket с указанным идентификатором.",
+        "operationId": "getTicketById",
+        "responses": {
+          "200": {
+            "description": "Билет успешно найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Передан некорректный идентификатор билета",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Билет с указанным идентификатором не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Обновить билет",
+        "description": "Полностью обновляет изменяемые поля билета с указанным идентификатором.\nid и creationDate сохраняются. Если поля event совпадают с текущими,\nevent.id сохраняется; иначе сервер создаёт мероприятие с новым event.id.\nЕсли event отсутствует или равен null, связь удаляется.\n",
+        "operationId": "updateTicket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ticket"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Билет успешно обновлён",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Идентификатор или JSON имеют некорректный формат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Билет с указанным идентификатором не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Данные нарушают ограничения целостности объекта Ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Удалить билет",
+        "description": "Удаляет билет с указанным идентификатором из коллекции.",
+        "operationId": "deleteTicket",
+        "responses": {
+          "204": {
+            "description": "Билет успешно удалён"
+          },
+          "400": {
+            "description": "Передан некорректный идентификатор билета",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Билет с указанным идентификатором не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/max-type": {
+      "get": {
+        "tags": [
+          "Ticket queries"
+        ],
+        "summary": "Получить билет с максимальным типом",
+        "description": "Возвращает один любой билет, поле `type` которого имеет\nмаксимальное значение среди всех билетов коллекции.\n\nЗначения сравниваются в порядке объявления перечисления:\n`VIP < USUAL < BUDGETARY < CHEAP`.\n\nЕсли максимальный тип имеют несколько билетов, сервис может\nвернуть любой из них.\n",
+        "operationId": "getTicketWithMaxType",
+        "responses": {
+          "200": {
+            "description": "Билет с максимальным значением поля type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ticket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Коллекция билетов пуста",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/comment-contains": {
+      "get": {
+        "tags": [
+          "Ticket queries"
+        ],
+        "summary": "Найти билеты по подстроке в комментарии",
+        "description": "Возвращает массив билетов, поле \"comment\" которых содержит\nзаданную подстроку\n",
+        "operationId": "getTicketsByCommentSubstring",
+        "parameters": [
+          {
+            "name": "substring",
+            "in": "query",
+            "required": true,
+            "description": "Подстрока, которую должно содержать поле comment",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "example": "сцена"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Массив найденных билетов",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Подстрока отсутствует или является пустой",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tickets/type-greater-than": {
+      "get": {
+        "tags": [
+          "Ticket queries"
+        ],
+        "summary": "Получить билеты с типом больше заданного",
+        "description": "Возвращает массив билетов, значение поля `type` которых больше\nпереданного значения\n",
+        "operationId": "getTicketsWithTypeGreaterThan",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": true,
+            "description": "Тип билета, с которым выполняется сравнение",
+            "schema": {
+              "$ref": "#/components/schemas/TicketType"
+            },
+            "example": "USUAL"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Массив билетов с типом больше заданного",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Ticket"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Передано неизвестное или отсутствующее значение типа",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sell/{ticket-id}/{person-id}/{price}": {
+      "servers": [
+        {
+          "url": "/booking",
+          "description": "Сервис продажи билетов и отмены бронирований"
+        }
+      ],
+      "post": {
+        "tags": [
+          "Booking"
+        ],
+        "summary": "Продать билет",
+        "description": "Продаёт указанный билет указанному человеку за переданную сумму.\nПолучает билет через GET /api/v1/tickets/{id} и обновляет его price через\nPUT /api/v1/tickets/{id}, передавая изменяемые поля в параметре ticket.\nПосле успешного обновления сохраняет внутреннюю связь ticket-id → person-id.\nСбой первого сервиса не должен оставлять новое бронирование.\nЕсли билет уже связан с человеком, возвращается 409, включая повторную продажу\nтому же человеку. Неизменённое вложенное event сохраняет свой id.\n",
+        "operationId": "sellTicket",
+        "parameters": [
+          {
+            "name": "ticket-id",
+            "in": "path",
+            "required": true,
+            "description": "Идентификатор продаваемого билета",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 10
+          },
+          {
+            "name": "person-id",
+            "in": "path",
+            "required": true,
+            "description": "Идентификатор человека, которому продаётся билет",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            },
+            "example": 42
+          },
+          {
+            "name": "price",
+            "in": "path",
+            "required": true,
+            "description": "Сумма продажи билета",
+            "schema": {
+              "type": "number",
+              "format": "double",
+              "minimum": 0,
+              "exclusiveMinimum": true
+            },
+            "example": 2500.5
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Билет успешно продан"
+          },
+          "400": {
+            "description": "Один или несколько параметров имеют некорректный формат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Билет с указанным идентификатором не найден",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Билет уже продан",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Первый сервис недоступен или вернул некорректный ответ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/person/{person-id}/cancel": {
+      "servers": [
+        {
+          "url": "/booking",
+          "description": "Сервис продажи билетов и отмены бронирований"
+        }
+      ],
+      "delete": {
+        "tags": [
+          "Booking"
+        ],
+        "summary": "Отменить все бронирования человека",
+        "description": "Отменяет все бронирования указанного человека.\nПолучает коллекцию через GET /api/v1/tickets (последовательно по страницам)\nи удаляет все внутренние связи с данным person-id, включая связи удалённых билетов.\nСами билеты и их price сохраняются. Поле person-id в JSON Ticket не добавляется.\nПри сбое первого сервиса связи сохраняются, возвращается 502.\nПовторная отмена и отсутствие бронирований возвращают 204.\n",
+        "operationId": "cancelPersonBookings",
+        "parameters": [
+          {
+            "name": "person-id",
+            "in": "path",
+            "required": true,
+            "description": "Идентификатор человека",
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 1
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Все бронирования человека успешно отменены"
+          },
+          "400": {
+            "description": "Идентификатор человека имеет некорректный формат",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Первый сервис недоступен или вернул некорректный ответ",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Ticket": {
+        "type": "object",
+        "description": "Билет",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "readOnly": true,
+            "description": "Уникальный автоматически генерируемый идентификатор билета",
+            "example": 10
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название билета. Строка не может быть пустой",
+            "example": "Билет в партер"
+          },
+          "coordinates": {
+            "$ref": "#/components/schemas/Coordinates"
+          },
+          "creationDate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?$",
+            "readOnly": true,
+            "description": "Автоматически генерируемые локальные дата и время создания (LocalDateTime), без часового пояса",
+            "example": "2026-09-16T14:30:00"
+          },
+          "price": {
+            "type": "number",
+            "format": "double",
+            "minimum": 0,
+            "exclusiveMinimum": true,
+            "description": "Цена билета. Значение должно быть больше 0",
+            "example": 2500.5
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 341,
+            "description": "Комментарий к билету. Поле не может быть null",
+            "example": "Место рядом со сценой"
+          },
+          "type": {
+            "$ref": "#/components/schemas/TicketType"
+          },
+          "event": {
+            "$ref": "#/components/schemas/Event"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "coordinates",
+          "creationDate",
+          "price",
+          "comment",
+          "type"
+        ]
+      },
+      "Coordinates": {
+        "type": "object",
+        "description": "Координаты билета",
+        "properties": {
+          "x": {
+            "type": "number",
+            "format": "double",
+            "minimum": -239,
+            "exclusiveMinimum": true,
+            "description": "Координата X (> -239)"
+          },
+          "y": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": -495,
+            "exclusiveMinimum": true,
+            "description": "Координата Y (> -495)"
+          }
+        },
+        "required": [
+          "x",
+          "y"
+        ]
+      },
+      "Event": {
+        "type": "object",
+        "nullable": true,
+        "description": "Мероприятие, для которого предназначен билет",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1,
+            "readOnly": true,
+            "description": "Уникальный автоматически генерируемый идентификатор мероприятия, должен быть >0"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Название мероприятия. Строка не может быть пустой"
+          },
+          "ticketsCount": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "description": "Количество билетов. Значение должно быть больше 0"
+          },
+          "eventType": {
+            "$ref": "#/components/schemas/EventType"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "ticketsCount"
+        ]
+      },
+      "TicketType": {
+        "type": "string",
+        "description": "Тип билета. Порядок сравнения: VIP < USUAL < BUDGETARY < CHEAP",
+        "enum": [
+          "VIP",
+          "USUAL",
+          "BUDGETARY",
+          "CHEAP"
+        ]
+      },
+      "EventType": {
+        "type": "string",
+        "nullable": true,
+        "description": "Тип мероприятия",
+        "enum": [
+          "CONCERT",
+          "BASKETBALL",
+          "OPERA",
+          null
+        ]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "description": "Информация об ошибке выполнения запроса",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Дата и время возникновения ошибки"
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "description": "HTTP-код ошибки"
+          },
+          "error": {
+            "type": "string",
+            "description": "Краткое название ошибки"
+          },
+          "message": {
+            "type": "string",
+            "description": "Подробное описание причины ошибки"
+          },
+          "path": {
+            "type": "string",
+            "description": "URL запроса, при обработке которого произошла ошибка"
+          }
+        },
+        "required": [
+          "timestamp",
+          "status",
+          "message",
+          "error",
+          "path"
+        ]
+      }
+    },
+    "parameters": {
+      "ticket": {
+        "name": "ticket",
+        "in": "query",
+        "required": true,
+        "description": "JSON-объект с изменяемыми полями Ticket, закодированный в URL.\nid, creationDate и event.id не передаются (генерируются сервером).\nevent может отсутствовать или быть null. Все остальные изменяемые поля обязательны.\nSwagger UI сериализует JSON и кодирует значение параметра автоматически.\n",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Ticket"
+            },
+            "example": {
+              "name": "Билет в партер",
+              "coordinates": {
+                "x": 10.5,
+                "y": 20
+              },
+              "price": 2500.5,
+              "comment": "Место рядом со сценой",
+              "type": "VIP",
+              "event": null
+            }
+          }
+        }
+      },
+      "page": {
+        "name": "page",
+        "in": "query",
+        "description": "Номер страницы с 0. Фильтрация и сортировка выполняются до пагинации. За пределами выборки возвращается пустой массив.",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 0,
+          "minimum": 0
+        }
+      },
+      "size": {
+        "name": "size",
+        "in": "query",
+        "description": "Максимальное количество элементов на странице.",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 10,
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "sort": {
+        "name": "sort",
+        "in": "query",
+        "description": "Один критерий имеет формат `поле,asc` или `поле,desc` (направление обязательно).\nНесколько критериев передаются повторением параметра:\n`?sort=price,desc&sort=name,asc`. Приоритет соответствует порядку параметров.\nПоддерживаются все поля Ticket: id, name, coordinates, creationDate, price,\ncomment, type, event; вложенные поля задаются через точку:\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\ncoordinates сравнивается по (x, y), event — по (id, name, ticketsCount, eventType).\nЧисла сравниваются численно, строки — по Unicode с учётом регистра,\ncreationDate — хронологически. Перечисления сравниваются в порядке объявления:\nVIP < USUAL < BUDGETARY < CHEAP; CONCERT < BASKETBALL < OPERA.\nnull и отсутствующие необязательные поля всегда идут последними.\nБез sort используется id,asc; при равенстве критериев id,asc служит последним\nкритерием для устойчивой пагинации при неизменной коллекции.\nНеизвестное поле, неверное направление или повтор одного поля — HTTP 400.\nПримеры здесь показаны до percent-encoding URL.\n",
+        "required": false,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "examples": {
+          "multiple": {
+            "summary": "Сначала цена по убыванию, затем название",
+            "value": [
+              "price,desc",
+              "name,asc"
+            ]
+          }
+        }
+      },
+      "filter": {
+        "name": "filter",
+        "in": "query",
+        "required": false,
+        "description": "Условие имеет формат `поле:оператор:значение`. Первые два двоеточия — разделители;\nоставшаяся часть целиком является значением (включая двоеточия в дате или тексте).\nНесколько условий передаются повторением filter и объединяются через AND:\n`?filter=price:gte:100&filter=price:lt:500&filter=event.eventType:eq:CONCERT`.\nМожно повторять одно поле и сочетать filter с любыми sort, page и size.\nПоля: id, name, coordinates, creationDate, price, comment, type, event,\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\nОператоры eq, ne доступны для всех полей; gt, gte, lt, lte — для чисел,\ncreationDate и перечислений; contains — для name, comment и event.name;\nisnull — для event и event.eventType, значение true или false.\nПримеры: `filter=comment:contains:сцена`, `filter=event:isnull:true`,\n`filter=creationDate:gte:2026-09-01T00:00:00`.\nЧисла записываются с точкой, даты — локальные ISO 8601 без часового пояса,\nenum — одним из объявленных имён; порядок enum такой же, как для sort.\nСтроки сравниваются с учётом регистра, contains ищет буквальную подстроку.\nДля coordinates и event операторы eq/ne принимают JSON-объект и сравнивают\nего структурно со всем объектом; для event также допустим JSON null.\nДля event.eventType допустимо значение null с eq/ne.\nОтсутствующее event считается null; вложенные поля отсутствующего event также null.\nСравнения с null, кроме eq/ne/isnull, дают false.\nЗначения кодируются percent-encoding при передаче в URL; строка после второго\nдвоеточия не обрезается. Неизвестное поле, оператор, несовместимый тип значения\nили некорректный синтаксис приводят к HTTP 400. Нет совпадений — HTTP 200 и [].\n",
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "example": [
+          "price:gte:100",
+          "type:gt:USUAL"
+        ]
+      }
+    }
+  }
+}
