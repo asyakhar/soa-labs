@@ -1,7 +1,8 @@
 type: string
-description: "Тип билета. Порядок сравнения: VIP < USUAL < BUDGETARY < CHEAP"
+description: 'Тип билета. Порядок сравнения: VIP < USUAL < BUDGETARY < CHEAP'
 enum:
   - VIP
   - USUAL
   - BUDGETARY
   - CHEAP
+title: Тип билета

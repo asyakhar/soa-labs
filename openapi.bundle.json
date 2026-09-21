@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Сервис управления и продажи билетов",
-    "description": "Спецификация двух веб-сервисов: управление коллекцией билетов и бронирование.\nВсе входные данные передаются в URL. Для POST и PUT объект Ticket передаётся\nкак JSON в query-параметре `ticket`, с percent-encoding значения.\nТела запросов не используются; объекты в ответах представлены в application/json.\nЭто буквальное толкование требования лабораторной; в обычном API для создания\nи обновления больших объектов предпочтительно JSON-тело запроса.\nПоля id, creationDate и event.id генерирует сервер; клиент их не передаёт.\nСвязь ticket-id → person-id хранится внутри сервиса бронирования,\nпоскольку исходный класс Ticket не содержит person-id.\nЗдесь опубликована спецификация, а не реализация сервисов.\n",
+    "description": "Спецификация двух веб-сервисов: управление коллекцией билетов и бронирование.\nВсе параметры предметной области передаются в URL. Для POST и PUT объект Ticket передаётся\nкак JSON в query-параметре `ticket`, с percent-encoding значения.\nЗаголовки ETag и If-None-Match используются только для условного чтения.\nТела запросов не используются; объекты в ответах представлены в application/json.\nЭто буквальное толкование требования лабораторной; в обычном API для создания\nи обновления больших объектов предпочтительно JSON-тело запроса.\nПоля id, creationDate и event.id генерирует сервер; клиент их не передаёт.\nСвязь ticket-id → person-id хранится внутри сервиса бронирования,\nпоскольку исходный класс Ticket не содержит person-id.\nЗдесь опубликована спецификация, а не реализация сервисов.\n\nОшибки проверки параметров GET/HEAD в этом учебном контракте возвращают 422.\nЭто соглашение API: протокол HTTP сам по себе допускает 400 для GET.\n",
     "version": "1.0.0",
     "contact": {
       "name": "Nostya && Dasha"
@@ -65,12 +65,25 @@
               }
             }
           },
-          "400": {
-            "description": "Некорректные параметры пагинации, сортировки или фильтрации",
+          "422": {
+            "description": "page должен быть целым int32 ≥ 0, size — целым от 1 до 100. Поле sort/filter должно входить в перечисленные поля Ticket; направление sort — asc или desc, оператор filter должен поддерживать тип поля, значение — соответствовать его типу. Нарушение любого из этих условий возвращает 422.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "size должен быть от 1 до 100; получено 101.",
+                  "path": "/api/v1/tickets",
+                  "violations": [
+                    {
+                      "field": "size",
+                      "message": "size должен быть от 1 до 100; получено 101."
+                    }
+                  ]
                 }
               }
             }
@@ -110,22 +123,70 @@
             }
           },
           "400": {
-            "description": "Параметр ticket отсутствует или содержит некорректный JSON",
+            "description": "Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую последовательность percent-encoding. Разбор запроса прекращён до проверки модели.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 400,
+                  "error": "Bad Request",
+                  "message": "В значении ticket после последнего свойства отсутствует закрывающая фигурная скобка.",
+                  "path": "/api/v1/tickets",
+                  "violations": [
+                    {
+                      "field": "ticket",
+                      "message": "В значении ticket после последнего свойства отсутствует закрывающая фигурная скобка."
+                    }
+                  ]
                 }
               }
             }
           },
           "422": {
-            "description": "Данные нарушают ограничения целостности объекта Ticket",
+            "description": "Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤ 0; comment отсутствует, равен null или длиннее 341 символа; type не входит в VIP, USUAL, BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст, ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы всех полей должны соответствовать схеме; генерируемые поля передавать нельзя.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "price должен быть числом больше 0; получено -10.",
+                  "path": "/api/v1/tickets",
+                  "violations": [
+                    {
+                      "field": "ticket.price",
+                      "message": "price должен быть числом больше 0; получено -10."
+                    }
+                  ]
                 }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Получить разрешённые методы коллекции",
+        "description": "Возвращает Allow со списком методов для /tickets. Это описание возможностей ресурса, не настройка CORS.",
+        "operationId": "optionsTickets",
+        "responses": {
+          "204": {
+            "description": "Методы перечислены в Allow; тело отсутствует.",
+            "headers": {
+              "Allow": {
+                "description": "HTTP-методы, поддерживаемые ресурсом /tickets.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "GET, POST, OPTIONS"
               }
             }
           }
@@ -152,7 +213,7 @@
           "Tickets"
         ],
         "summary": "Получить билет по идентификатору",
-        "description": "Возвращает объект Ticket с указанным идентификатором.",
+        "description": "Возвращает объект Ticket с указанным идентификатором. При If-None-Match проверяет актуальность сохранённого представления.",
         "operationId": "getTicketById",
         "responses": {
           "200": {
@@ -163,29 +224,75 @@
                   "$ref": "#/components/schemas/Ticket"
                 }
               }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Тег текущего представления билета. Меняется при изменении представления.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"ticket-10-v1\""
+              }
             }
           },
-          "400": {
-            "description": "Передан некорректный идентификатор билета",
-            "content": {
-              "application/json": {
+          "304": {
+            "description": "Билет существует, а условие If-None-Match совпало с текущим ETag. Используйте сохранённое представление; тело ответа отсутствует.",
+            "headers": {
+              "ETag": {
+                "description": "Тег текущего представления билета. Меняется при изменении представления.",
                 "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
+                  "type": "string"
+                },
+                "example": "\"ticket-10-v1\""
               }
             }
           },
           "404": {
-            "description": "Билет с указанным идентификатором не найден",
+            "description": "Билет с переданным положительным id отсутствует в коллекции.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 404,
+                  "error": "Not Found",
+                  "message": "Билет с id 10 не найден.",
+                  "path": "/api/v1/tickets/10"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное значение или число за пределами int64.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "id должен быть целым числом больше 0; получено -1.",
+                  "path": "/api/v1/tickets/-1",
+                  "violations": [
+                    {
+                      "field": "id",
+                      "message": "id должен быть целым числом больше 0; получено -1."
+                    }
+                  ]
                 }
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ifNoneMatch"
+          }
+        ]
       },
       "put": {
         "tags": [
@@ -211,31 +318,64 @@
             }
           },
           "400": {
-            "description": "Идентификатор или JSON имеют некорректный формат",
+            "description": "Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую последовательность percent-encoding. Разбор запроса прекращён до проверки модели.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 400,
+                  "error": "Bad Request",
+                  "message": "В значении ticket после последнего свойства отсутствует закрывающая фигурная скобка.",
+                  "path": "/api/v1/tickets",
+                  "violations": [
+                    {
+                      "field": "ticket",
+                      "message": "В значении ticket после последнего свойства отсутствует закрывающая фигурная скобка."
+                    }
+                  ]
                 }
               }
             }
           },
           "404": {
-            "description": "Билет с указанным идентификатором не найден",
+            "description": "Билет с переданным положительным id отсутствует в коллекции.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 404,
+                  "error": "Not Found",
+                  "message": "Билет с id 10 не найден.",
+                  "path": "/api/v1/tickets/10"
                 }
               }
             }
           },
           "422": {
-            "description": "Данные нарушают ограничения целостности объекта Ticket",
+            "description": "Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤ 0; comment отсутствует, равен null или длиннее 341 символа; type не входит в VIP, USUAL, BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст, ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы всех полей должны соответствовать схеме; генерируемые поля передавать нельзя. Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное значение или число за пределами int64.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "price должен быть числом больше 0; получено -10.",
+                  "path": "/api/v1/tickets",
+                  "violations": [
+                    {
+                      "field": "ticket.price",
+                      "message": "price должен быть числом больше 0; получено -10."
+                    }
+                  ]
                 }
               }
             }
@@ -247,31 +387,79 @@
           "Tickets"
         ],
         "summary": "Удалить билет",
-        "description": "Удаляет билет с указанным идентификатором из коллекции.",
+        "description": "Удаляет билет с указанным id. Если билет уже удалён или никогда не существовал, также возвращает 204 без тела. Повторный вызов сохраняет состояние отсутствия билета.",
         "operationId": "deleteTicket",
         "responses": {
           "204": {
-            "description": "Билет успешно удалён"
+            "description": "Билет отсутствует в коллекции: удалён этим запросом или отсутствовал до запроса. Тело ответа отсутствует."
           },
-          "400": {
-            "description": "Передан некорректный идентификатор билета",
+          "422": {
+            "description": "Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное значение или число за пределами int64.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "id должен быть целым числом больше 0; получено -1.",
+                  "path": "/api/v1/tickets/-1",
+                  "violations": [
+                    {
+                      "field": "id",
+                      "message": "id должен быть целым числом больше 0; получено -1."
+                    }
+                  ]
                 }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "tags": [
+          "Tickets"
+        ],
+        "summary": "Получить заголовки билета без тела",
+        "description": "Имеет статусы и заголовки GET билета, но никогда не возвращает тело, в том числе при ошибке. Позволяет проверить существование и ETag.",
+        "operationId": "headTicket",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ifNoneMatch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Билет успешно найден",
+            "headers": {
+              "ETag": {
+                "description": "Тег текущего представления билета. Меняется при изменении представления.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"ticket-10-v1\""
+              }
+            }
+          },
+          "304": {
+            "description": "Билет существует, а условие If-None-Match совпало с текущим ETag. Используйте сохранённое представление; тело ответа отсутствует.",
+            "headers": {
+              "ETag": {
+                "description": "Тег текущего представления билета. Меняется при изменении представления.",
+                "schema": {
+                  "type": "string"
+                },
+                "example": "\"ticket-10-v1\""
               }
             }
           },
           "404": {
-            "description": "Билет с указанным идентификатором не найден",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "description": "Билет с переданным положительным id отсутствует в коллекции."
+          },
+          "422": {
+            "description": "Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное значение или число за пределами int64."
           }
         }
       }
@@ -296,11 +484,18 @@
             }
           },
           "404": {
-            "description": "Коллекция билетов пуста",
+            "description": "В коллекции нет ни одного билета; объект с максимальным type выбрать невозможно.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 404,
+                  "error": "Not Found",
+                  "message": "Коллекция билетов пуста.",
+                  "path": "/api/v1/tickets/max-type"
                 }
               }
             }
@@ -343,12 +538,25 @@
               }
             }
           },
-          "400": {
-            "description": "Подстрока отсутствует или является пустой",
+          "422": {
+            "description": "Обязательный query-параметр substring отсутствует или содержит строку длиной 0.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "substring должен содержать хотя бы один символ.",
+                  "path": "/api/v1/tickets/comment-contains",
+                  "violations": [
+                    {
+                      "field": "substring",
+                      "message": "substring должен содержать хотя бы один символ."
+                    }
+                  ]
                 }
               }
             }
@@ -390,12 +598,25 @@
               }
             }
           },
-          "400": {
-            "description": "Передано неизвестное или отсутствующее значение типа",
+          "422": {
+            "description": "Обязательный query-параметр type отсутствует либо отличается от VIP, USUAL, BUDGETARY и CHEAP. Сравнение учитывает регистр.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "type должен быть VIP, USUAL, BUDGETARY или CHEAP; получено STANDARD.",
+                  "path": "/api/v1/tickets/type-greater-than",
+                  "violations": [
+                    {
+                      "field": "type",
+                      "message": "type должен быть VIP, USUAL, BUDGETARY или CHEAP; получено STANDARD."
+                    }
+                  ]
                 }
               }
             }
@@ -460,42 +681,76 @@
           "204": {
             "description": "Билет успешно продан"
           },
-          "400": {
-            "description": "Один или несколько параметров имеют некорректный формат",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
           "404": {
-            "description": "Билет с указанным идентификатором не найден",
+            "description": "Билет с переданным положительным id отсутствует в коллекции.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 404,
+                  "error": "Not Found",
+                  "message": "Билет с id 10 не найден.",
+                  "path": "/booking/sell/10/42/100"
                 }
               }
             }
           },
           "409": {
-            "description": "Билет уже продан",
+            "description": "Для ticket-id уже существует связь с владельцем, включая того же person-id. Повторная продажа не выполняется.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 409,
+                  "error": "Conflict",
+                  "message": "Билет с id 10 уже продан.",
+                  "path": "/booking/sell/10/42/100"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "ticket-id и person-id должны быть целыми int64 > 0; price должен быть конечным числом > 0 с точкой в качестве десятичного разделителя.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "price должен быть больше 0; получено 0.",
+                  "path": "/booking/sell/10/42/0",
+                  "violations": [
+                    {
+                      "field": "price",
+                      "message": "price должен быть больше 0; получено 0."
+                    }
+                  ]
                 }
               }
             }
           },
           "502": {
-            "description": "Первый сервис недоступен или вернул некорректный ответ",
+            "description": "Не удалось установить соединение с первым сервисом либо его ответ не соответствует ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 502,
+                  "error": "Bad Gateway",
+                  "message": "Сервис коллекции билетов не установил соединение.",
+                  "path": "/booking/sell/{ticket-id}/{person-id}/{price}"
                 }
               }
             }
@@ -534,22 +789,42 @@
           "204": {
             "description": "Все бронирования человека успешно отменены"
           },
-          "400": {
-            "description": "Идентификатор человека имеет некорректный формат",
+          "422": {
+            "description": "person-id должен быть целым числом int64 больше 0.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 422,
+                  "error": "Unprocessable Content",
+                  "message": "person-id должен быть целым числом больше 0; получено -1.",
+                  "path": "/booking/person/-1/cancel",
+                  "violations": [
+                    {
+                      "field": "person-id",
+                      "message": "person-id должен быть целым числом больше 0; получено -1."
+                    }
+                  ]
                 }
               }
             }
           },
           "502": {
-            "description": "Первый сервис недоступен или вернул некорректный ответ",
+            "description": "Не удалось установить соединение с первым сервисом либо его ответ не соответствует ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                },
+                "example": {
+                  "timestamp": "21.09.2026 14:30:00",
+                  "status": 502,
+                  "error": "Bad Gateway",
+                  "message": "Сервис коллекции билетов не установил соединение.",
+                  "path": "/booking/person/{person-id}/cancel"
                 }
               }
             }
@@ -583,10 +858,10 @@
           },
           "creationDate": {
             "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,9})?$",
+            "pattern": "^(0[1-9]|[12][0-9]|3[01])\\.(0[1-9]|1[0-2])\\.\\d{4} ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.\\d{1,9})?$",
             "readOnly": true,
-            "description": "Автоматически генерируемые локальные дата и время создания (LocalDateTime), без часового пояса",
-            "example": "2026-09-16T14:30:00"
+            "description": "Дата и время создания, генерируются сервером. Формат dd.MM.yyyy HH:mm:ss с необязательными долями секунды (1–9 цифр), без часового пояса. Пример: 21 сентября 2026, 14:30. Календарную корректность проверяет сервер.",
+            "example": "21.09.2026 14:30:00"
           },
           "price": {
             "type": "number",
@@ -617,7 +892,8 @@
           "price",
           "comment",
           "type"
-        ]
+        ],
+        "title": "Билет"
       },
       "Coordinates": {
         "type": "object",
@@ -628,20 +904,23 @@
             "format": "double",
             "minimum": -239,
             "exclusiveMinimum": true,
-            "description": "Координата X (> -239)"
+            "description": "Координата X (> -239)",
+            "example": 10.5
           },
           "y": {
             "type": "integer",
             "format": "int64",
             "minimum": -495,
             "exclusiveMinimum": true,
-            "description": "Координата Y (> -495)"
+            "description": "Координата Y (> -495)",
+            "example": 20
           }
         },
         "required": [
           "x",
           "y"
-        ]
+        ],
+        "title": "Координаты"
       },
       "Event": {
         "type": "object",
@@ -653,18 +932,21 @@
             "format": "int64",
             "minimum": 1,
             "readOnly": true,
-            "description": "Уникальный автоматически генерируемый идентификатор мероприятия, должен быть >0"
+            "description": "Уникальный автоматически генерируемый идентификатор мероприятия, должен быть >0",
+            "example": 7
           },
           "name": {
             "type": "string",
             "minLength": 1,
-            "description": "Название мероприятия. Строка не может быть пустой"
+            "description": "Название мероприятия. Строка не может быть пустой",
+            "example": "Вечер оперы"
           },
           "ticketsCount": {
             "type": "integer",
             "format": "int32",
             "minimum": 1,
-            "description": "Количество билетов. Значение должно быть больше 0"
+            "description": "Количество билетов. Значение должно быть больше 0",
+            "example": 120
           },
           "eventType": {
             "$ref": "#/components/schemas/EventType"
@@ -674,7 +956,8 @@
           "id",
           "name",
           "ticketsCount"
-        ]
+        ],
+        "title": "Мероприятие"
       },
       "TicketType": {
         "type": "string",
@@ -684,7 +967,8 @@
           "USUAL",
           "BUDGETARY",
           "CHEAP"
-        ]
+        ],
+        "title": "Тип билета"
       },
       "EventType": {
         "type": "string",
@@ -695,7 +979,8 @@
           "BASKETBALL",
           "OPERA",
           null
-        ]
+        ],
+        "title": "Тип мероприятия"
       },
       "ErrorResponse": {
         "type": "object",
@@ -703,25 +988,55 @@
         "properties": {
           "timestamp": {
             "type": "string",
-            "format": "date-time",
-            "description": "Дата и время возникновения ошибки"
+            "description": "Время ошибки в UTC в формате dd.MM.yyyy HH:mm:ss, необязательные доли секунды.",
+            "pattern": "^(0[1-9]|[12][0-9]|3[01])\\.(0[1-9]|1[0-2])\\.\\d{4} ([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.\\d{1,9})?$",
+            "example": "21.09.2026 14:30:00"
           },
           "status": {
             "type": "integer",
             "format": "int32",
-            "description": "HTTP-код ошибки"
+            "description": "HTTP-код ошибки",
+            "minimum": 400,
+            "maximum": 599,
+            "example": 422
           },
           "error": {
             "type": "string",
-            "description": "Краткое название ошибки"
+            "description": "Краткое название ошибки",
+            "example": "Unprocessable Content"
           },
           "message": {
             "type": "string",
-            "description": "Подробное описание причины ошибки"
+            "description": "Подробное описание причины ошибки",
+            "example": "price должен быть больше 0; получено -10."
           },
           "path": {
             "type": "string",
-            "description": "URL запроса, при обработке которого произошла ошибка"
+            "description": "URL запроса, при обработке которого произошла ошибка",
+            "example": "/api/v1/tickets"
+          },
+          "violations": {
+            "type": "array",
+            "description": "Список нарушений схемы с именами полей. Для ошибок разбора может указываться весь параметр ticket.",
+            "items": {
+              "type": "object",
+              "required": [
+                "field",
+                "message"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "description": "Путь поля или имя параметра.",
+                  "example": "ticket.price"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "Условие, которое нарушено, и переданное значение.",
+                  "example": "price должен быть больше 0; получено -10."
+                }
+              }
+            }
           }
         },
         "required": [
@@ -730,7 +1045,8 @@
           "message",
           "error",
           "path"
-        ]
+        ],
+        "title": "Ошибка API"
       }
     },
     "parameters": {
@@ -786,7 +1102,7 @@
       "sort": {
         "name": "sort",
         "in": "query",
-        "description": "Один критерий имеет формат `поле,asc` или `поле,desc` (направление обязательно).\nНесколько критериев передаются повторением параметра:\n`?sort=price,desc&sort=name,asc`. Приоритет соответствует порядку параметров.\nПоддерживаются все поля Ticket: id, name, coordinates, creationDate, price,\ncomment, type, event; вложенные поля задаются через точку:\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\ncoordinates сравнивается по (x, y), event — по (id, name, ticketsCount, eventType).\nЧисла сравниваются численно, строки — по Unicode с учётом регистра,\ncreationDate — хронологически. Перечисления сравниваются в порядке объявления:\nVIP < USUAL < BUDGETARY < CHEAP; CONCERT < BASKETBALL < OPERA.\nnull и отсутствующие необязательные поля всегда идут последними.\nБез sort используется id,asc; при равенстве критериев id,asc служит последним\nкритерием для устойчивой пагинации при неизменной коллекции.\nНеизвестное поле, неверное направление или повтор одного поля — HTTP 400.\nПримеры здесь показаны до percent-encoding URL.\n",
+        "description": "Один критерий имеет формат `поле,asc` или `поле,desc` (направление обязательно).\nНесколько критериев передаются повторением параметра:\n`?sort=price,desc&sort=name,asc`. Приоритет соответствует порядку параметров.\nПоддерживаются все поля Ticket: id, name, coordinates, creationDate, price,\ncomment, type, event; вложенные поля задаются через точку:\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\ncoordinates сравнивается по (x, y), event — по (id, name, ticketsCount, eventType).\nЧисла сравниваются численно, строки — по Unicode с учётом регистра,\ncreationDate — хронологически. Перечисления сравниваются в порядке объявления:\nVIP < USUAL < BUDGETARY < CHEAP; CONCERT < BASKETBALL < OPERA.\nnull и отсутствующие необязательные поля всегда идут последними.\nБез sort используется id,asc; при равенстве критериев id,asc служит последним\nкритерием для устойчивой пагинации при неизменной коллекции.\nНеизвестное поле, неверное направление или повтор одного поля — HTTP 422.\nПримеры здесь показаны до percent-encoding URL.\n",
         "required": false,
         "style": "form",
         "explode": true,
@@ -811,7 +1127,7 @@
         "name": "filter",
         "in": "query",
         "required": false,
-        "description": "Условие имеет формат `поле:оператор:значение`. Первые два двоеточия — разделители;\nоставшаяся часть целиком является значением (включая двоеточия в дате или тексте).\nНесколько условий передаются повторением filter и объединяются через AND:\n`?filter=price:gte:100&filter=price:lt:500&filter=event.eventType:eq:CONCERT`.\nМожно повторять одно поле и сочетать filter с любыми sort, page и size.\nПоля: id, name, coordinates, creationDate, price, comment, type, event,\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\nОператоры eq, ne доступны для всех полей; gt, gte, lt, lte — для чисел,\ncreationDate и перечислений; contains — для name, comment и event.name;\nisnull — для event и event.eventType, значение true или false.\nПримеры: `filter=comment:contains:сцена`, `filter=event:isnull:true`,\n`filter=creationDate:gte:2026-09-01T00:00:00`.\nЧисла записываются с точкой, даты — локальные ISO 8601 без часового пояса,\nenum — одним из объявленных имён; порядок enum такой же, как для sort.\nСтроки сравниваются с учётом регистра, contains ищет буквальную подстроку.\nДля coordinates и event операторы eq/ne принимают JSON-объект и сравнивают\nего структурно со всем объектом; для event также допустим JSON null.\nДля event.eventType допустимо значение null с eq/ne.\nОтсутствующее event считается null; вложенные поля отсутствующего event также null.\nСравнения с null, кроме eq/ne/isnull, дают false.\nЗначения кодируются percent-encoding при передаче в URL; строка после второго\nдвоеточия не обрезается. Неизвестное поле, оператор, несовместимый тип значения\nили некорректный синтаксис приводят к HTTP 400. Нет совпадений — HTTP 200 и [].\n",
+        "description": "Условие имеет формат `поле:оператор:значение`. Первые два двоеточия — разделители;\nоставшаяся часть целиком является значением (включая двоеточия в дате или тексте).\nНесколько условий передаются повторением filter и объединяются через AND:\n`?filter=price:gte:100&filter=price:lt:500&filter=event.eventType:eq:CONCERT`.\nМожно повторять одно поле и сочетать filter с любыми sort, page и size.\nПоля: id, name, coordinates, creationDate, price, comment, type, event,\ncoordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.\nОператоры eq, ne доступны для всех полей; gt, gte, lt, lte — для чисел,\ncreationDate и перечислений; contains — для name, comment и event.name;\nisnull — для event и event.eventType, значение true или false.\nПримеры: `filter=comment:contains:сцена`, `filter=event:isnull:true`,\n`filter=creationDate:gte:01.09.2026 00:00:00`.\nЧисла записываются с точкой, даты — локальные dd.MM.yyyy HH:mm:ss с необязательными долями секунды, без часового пояса,\nenum — одним из объявленных имён; порядок enum такой же, как для sort.\nСтроки сравниваются с учётом регистра, contains ищет буквальную подстроку.\nДля coordinates и event операторы eq/ne принимают JSON-объект и сравнивают\nего структурно со всем объектом; для event также допустим JSON null.\nДля event.eventType допустимо значение null с eq/ne.\nОтсутствующее event считается null; вложенные поля отсутствующего event также null.\nСравнения с null, кроме eq/ne/isnull, дают false.\nЗначения кодируются percent-encoding при передаче в URL; строка после второго\nдвоеточия не обрезается. Неизвестное поле, оператор, несовместимый тип значения\nили некорректный синтаксис приводят к HTTP 422. Нет совпадений — HTTP 200 и [].\n",
         "style": "form",
         "explode": true,
         "schema": {
@@ -825,6 +1141,16 @@
           "price:gte:100",
           "type:gt:USUAL"
         ]
+      },
+      "ifNoneMatch": {
+        "name": "If-None-Match",
+        "in": "header",
+        "required": false,
+        "description": "Тег из ETag предыдущего ответа, список тегов через запятую или *. При совпадении с текущим представлением возвращается 304 без тела; если билет отсутствует — 404.",
+        "schema": {
+          "type": "string"
+        },
+        "example": "\"ticket-10-v1\""
       }
     }
   }

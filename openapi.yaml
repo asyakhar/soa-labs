@@ -3,8 +3,9 @@ info:
   title: Сервис управления и продажи билетов
   description: |
     Спецификация двух веб-сервисов: управление коллекцией билетов и бронирование.
-    Все входные данные передаются в URL. Для POST и PUT объект Ticket передаётся
+    Все параметры предметной области передаются в URL. Для POST и PUT объект Ticket передаётся
     как JSON в query-параметре `ticket`, с percent-encoding значения.
+    Заголовки ETag и If-None-Match используются только для условного чтения.
     Тела запросов не используются; объекты в ответах представлены в application/json.
     Это буквальное толкование требования лабораторной; в обычном API для создания
     и обновления больших объектов предпочтительно JSON-тело запроса.
@@ -12,12 +13,15 @@ info:
     Связь ticket-id → person-id хранится внутри сервиса бронирования,
     поскольку исходный класс Ticket не содержит person-id.
     Здесь опубликована спецификация, а не реализация сервисов.
+
+    Ошибки проверки параметров GET/HEAD в этом учебном контракте возвращают 422.
+    Это соглашение API: протокол HTTP сам по себе допускает 400 для GET.
   version: 1.0.0
-  contact: 
+  contact:
     name: Nostya && Dasha
-servers: 
+servers:
   - url: /api/v1
-    description: Основной сервис управления коллекцией билетов 
+    description: Основной сервис управления коллекцией билетов
 tags:
   - name: Tickets
     description: Базовые операции над коллекцией билетов
@@ -25,7 +29,7 @@ tags:
     description: Специальные операции выборки билетов
   - name: Booking
     description: Продажа билетов и отмена бронирований
-paths: 
+paths:
   /tickets:
     get:
       tags:
@@ -34,10 +38,10 @@ paths:
       description: Возвращает массив билетов
       operationId: getTickets
       parameters:
-            - $ref: '#/components/parameters/page'
-            - $ref: '#/components/parameters/size'
-            - $ref: '#/components/parameters/sort'
-            - $ref: '#/components/parameters/filter'
+        - $ref: '#/components/parameters/page'
+        - $ref: '#/components/parameters/size'
+        - $ref: '#/components/parameters/sort'
+        - $ref: '#/components/parameters/filter'
       responses:
         '200':
           description: Массив билетов успешно получен
@@ -47,12 +51,25 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
-        '400':
-          description: Некорректные параметры пагинации, сортировки или фильтрации
+        '422':
+          description: >-
+            page должен быть целым int32 ≥ 0, size — целым от 1 до 100. Поле sort/filter должно
+            входить в перечисленные поля Ticket; направление sort — asc или desc, оператор filter
+            должен поддерживать тип поля, значение — соответствовать его типу. Нарушение любого из
+            этих условий возвращает 422.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: size должен быть от 1 до 100; получено 101.
+                path: /api/v1/tickets
+                violations:
+                  - field: size
+                    message: size должен быть от 1 до 100; получено 101.
     post:
       tags:
         - Tickets
@@ -74,20 +91,66 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
-
         '400':
-          description: Параметр ticket отсутствует или содержит некорректный JSON
+          description: >-
+            Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует
+            закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую
+            последовательность percent-encoding. Разбор запроса прекращён до проверки модели.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: >-
+                  В значении ticket после последнего свойства отсутствует закрывающая фигурная
+                  скобка.
+                path: /api/v1/tickets
+                violations:
+                  - field: ticket
+                    message: >-
+                      В значении ticket после последнего свойства отсутствует закрывающая фигурная
+                      скобка.
         '422':
-          description: Данные нарушают ограничения целостности объекта Ticket
+          description: >-
+            Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует
+            или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤
+            0; comment отсутствует, равен null или длиннее 341 символа; type не входит в VIP, USUAL,
+            BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст,
+            ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы
+            всех полей должны соответствовать схеме; генерируемые поля передавать нельзя.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: price должен быть числом больше 0; получено -10.
+                path: /api/v1/tickets
+                violations:
+                  - field: ticket.price
+                    message: price должен быть числом больше 0; получено -10.
+    options:
+      tags:
+        - Tickets
+      summary: Получить разрешённые методы коллекции
+      description: >-
+        Возвращает Allow со списком методов для /tickets. Это описание возможностей ресурса, не
+        настройка CORS.
+      operationId: optionsTickets
+      responses:
+        '204':
+          description: Методы перечислены в Allow; тело отсутствует.
+          headers:
+            Allow:
+              description: HTTP-методы, поддерживаемые ресурсом /tickets.
+              schema:
+                type: string
+              example: GET, POST, OPTIONS
   /tickets/{id}:
     parameters:
       - name: id
@@ -99,12 +162,13 @@ paths:
           format: int64
           minimum: 1
         example: 10
-
     get:
       tags:
         - Tickets
       summary: Получить билет по идентификатору
-      description: Возвращает объект Ticket с указанным идентификатором.
+      description: >-
+        Возвращает объект Ticket с указанным идентификатором. При If-None-Match проверяет
+        актуальность сохранённого представления.
       operationId: getTicketById
       responses:
         '200':
@@ -113,21 +177,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
-
-        '400':
-          description: Передан некорректный идентификатор билета
-          content:
-            application/json:
+          headers:
+            ETag:
+              description: Тег текущего представления билета. Меняется при изменении представления.
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
+                type: string
+              example: '"ticket-10-v1"'
+        '304':
+          description: >-
+            Билет существует, а условие If-None-Match совпало с текущим ETag. Используйте
+            сохранённое представление; тело ответа отсутствует.
+          headers:
+            ETag:
+              description: Тег текущего представления билета. Меняется при изменении представления.
+              schema:
+                type: string
+              example: '"ticket-10-v1"'
         '404':
-          description: Билет с указанным идентификатором не найден
+          description: Билет с переданным положительным id отсутствует в коллекции.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 404
+                error: Not Found
+                message: Билет с id 10 не найден.
+                path: /api/v1/tickets/10
+        '422':
+          description: >-
+            Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное,
+            неположительное значение или число за пределами int64.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: id должен быть целым числом больше 0; получено -1.
+                path: /api/v1/tickets/-1
+                violations:
+                  - field: id
+                    message: id должен быть целым числом больше 0; получено -1.
+      parameters:
+        - $ref: '#/components/parameters/ifNoneMatch'
     put:
       tags:
         - Tickets
@@ -140,7 +236,6 @@ paths:
       operationId: updateTicket
       parameters:
         - $ref: '#/components/parameters/ticket'
-
       responses:
         '200':
           description: Билет успешно обновлён
@@ -148,51 +243,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
-
         '400':
-          description: Идентификатор или JSON имеют некорректный формат
+          description: >-
+            Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует
+            закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую
+            последовательность percent-encoding. Разбор запроса прекращён до проверки модели.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: >-
+                  В значении ticket после последнего свойства отсутствует закрывающая фигурная
+                  скобка.
+                path: /api/v1/tickets
+                violations:
+                  - field: ticket
+                    message: >-
+                      В значении ticket после последнего свойства отсутствует закрывающая фигурная
+                      скобка.
         '404':
-          description: Билет с указанным идентификатором не найден
+          description: Билет с переданным положительным id отсутствует в коллекции.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 404
+                error: Not Found
+                message: Билет с id 10 не найден.
+                path: /api/v1/tickets/10
         '422':
-          description: Данные нарушают ограничения целостности объекта Ticket
+          description: >-
+            Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует
+            или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤
+            0; comment отсутствует, равен null или длиннее 341 символа; type не входит в VIP, USUAL,
+            BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст,
+            ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы
+            всех полей должны соответствовать схеме; генерируемые поля передавать нельзя. Параметр
+            id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное
+            значение или число за пределами int64.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: price должен быть числом больше 0; получено -10.
+                path: /api/v1/tickets
+                violations:
+                  - field: ticket.price
+                    message: price должен быть числом больше 0; получено -10.
     delete:
       tags:
         - Tickets
       summary: Удалить билет
-      description: Удаляет билет с указанным идентификатором из коллекции.
+      description: >-
+        Удаляет билет с указанным id. Если билет уже удалён или никогда не существовал, также
+        возвращает 204 без тела. Повторный вызов сохраняет состояние отсутствия билета.
       operationId: deleteTicket
       responses:
         '204':
-          description: Билет успешно удалён
-
-        '400':
-          description: Передан некорректный идентификатор билета
+          description: >-
+            Билет отсутствует в коллекции: удалён этим запросом или отсутствовал до запроса. Тело
+            ответа отсутствует.
+        '422':
+          description: >-
+            Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное,
+            неположительное значение или число за пределами int64.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: id должен быть целым числом больше 0; получено -1.
+                path: /api/v1/tickets/-1
+                violations:
+                  - field: id
+                    message: id должен быть целым числом больше 0; получено -1.
+    head:
+      tags:
+        - Tickets
+      summary: Получить заголовки билета без тела
+      description: >-
+        Имеет статусы и заголовки GET билета, но никогда не возвращает тело, в том числе при ошибке.
+        Позволяет проверить существование и ETag.
+      operationId: headTicket
+      parameters:
+        - $ref: '#/components/parameters/ifNoneMatch'
+      responses:
+        '200':
+          description: Билет успешно найден
+          headers:
+            ETag:
+              description: Тег текущего представления билета. Меняется при изменении представления.
+              schema:
+                type: string
+              example: '"ticket-10-v1"'
+        '304':
+          description: >-
+            Билет существует, а условие If-None-Match совпало с текущим ETag. Используйте
+            сохранённое представление; тело ответа отсутствует.
+          headers:
+            ETag:
+              description: Тег текущего представления билета. Меняется при изменении представления.
+              schema:
+                type: string
+              example: '"ticket-10-v1"'
         '404':
-          description: Билет с указанным идентификатором не найден
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          description: Билет с переданным положительным id отсутствует в коллекции.
+        '422':
+          description: >-
+            Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное,
+            неположительное значение или число за пределами int64.
   /tickets/max-type:
     get:
       tags:
@@ -215,14 +387,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Ticket'
-
         '404':
-          description: Коллекция билетов пуста
+          description: В коллекции нет ни одного билета; объект с максимальным type выбрать невозможно.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 404
+                error: Not Found
+                message: Коллекция билетов пуста.
+                path: /api/v1/tickets/max-type
   /tickets/comment-contains:
     get:
       tags:
@@ -250,14 +426,21 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
-
-        '400':
-          description: Подстрока отсутствует или является пустой
+        '422':
+          description: Обязательный query-параметр substring отсутствует или содержит строку длиной 0.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: substring должен содержать хотя бы один символ.
+                path: /api/v1/tickets/comment-contains
+                violations:
+                  - field: substring
+                    message: substring должен содержать хотя бы один символ.
   /tickets/type-greater-than:
     get:
       tags:
@@ -284,13 +467,23 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ticket'
-
-        '400':
-          description: Передано неизвестное или отсутствующее значение типа
+        '422':
+          description: >-
+            Обязательный query-параметр type отсутствует либо отличается от VIP, USUAL, BUDGETARY и
+            CHEAP. Сравнение учитывает регистр.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: type должен быть VIP, USUAL, BUDGETARY или CHEAP; получено STANDARD.
+                path: /api/v1/tickets/type-greater-than
+                violations:
+                  - field: type
+                    message: type должен быть VIP, USUAL, BUDGETARY или CHEAP; получено STANDARD.
   /sell/{ticket-id}/{person-id}/{price}:
     servers:
       - url: /booking
@@ -318,7 +511,6 @@ paths:
             format: int64
             minimum: 1
           example: 10
-
         - name: person-id
           in: path
           required: true
@@ -328,7 +520,6 @@ paths:
             format: int64
             minimum: 1
           example: 42
-
         - name: price
           in: path
           required: true
@@ -338,40 +529,67 @@ paths:
             format: double
             minimum: 0
             exclusiveMinimum: true
-          example: 2500.50
-
+          example: 2500.5
       responses:
         '204':
           description: Билет успешно продан
-
-        '400':
-          description: Один или несколько параметров имеют некорректный формат
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-
         '404':
-          description: Билет с указанным идентификатором не найден
+          description: Билет с переданным положительным id отсутствует в коллекции.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 404
+                error: Not Found
+                message: Билет с id 10 не найден.
+                path: /booking/sell/10/42/100
         '409':
-          description: Билет уже продан
+          description: >-
+            Для ticket-id уже существует связь с владельцем, включая того же person-id. Повторная
+            продажа не выполняется.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 409
+                error: Conflict
+                message: Билет с id 10 уже продан.
+                path: /booking/sell/10/42/100
+        '422':
+          description: >-
+            ticket-id и person-id должны быть целыми int64 > 0; price должен быть конечным числом >
+            0 с точкой в качестве десятичного разделителя.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: price должен быть больше 0; получено 0.
+                path: /booking/sell/10/42/0
+                violations:
+                  - field: price
+                    message: price должен быть больше 0; получено 0.
         '502':
-          description: Первый сервис недоступен или вернул некорректный ответ
+          description: >-
+            Не удалось установить соединение с первым сервисом либо его ответ не соответствует
+            ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 502
+                error: Bad Gateway
+                message: Сервис коллекции билетов не установил соединение.
+                path: /booking/sell/{ticket-id}/{person-id}/{price}
   /person/{person-id}/cancel:
     servers:
       - url: /booking
@@ -400,35 +618,49 @@ paths:
       responses:
         '204':
           description: Все бронирования человека успешно отменены
-
-        '400':
-          description: Идентификатор человека имеет некорректный формат
+        '422':
+          description: person-id должен быть целым числом int64 больше 0.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: person-id должен быть целым числом больше 0; получено -1.
+                path: /booking/person/-1/cancel
+                violations:
+                  - field: person-id
+                    message: person-id должен быть целым числом больше 0; получено -1.
         '502':
-          description: Первый сервис недоступен или вернул некорректный ответ
+          description: >-
+            Не удалось установить соединение с первым сервисом либо его ответ не соответствует
+            ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 502
+                error: Bad Gateway
+                message: Сервис коллекции билетов не установил соединение.
+                path: /booking/person/{person-id}/cancel
 components:
   schemas:
     Ticket:
-      $ref: './components/schemas/Ticket.yaml'
+      $ref: ./components/schemas/Ticket.yaml
     Coordinates:
-      $ref: './components/schemas/Coordinates.yaml'
+      $ref: ./components/schemas/Coordinates.yaml
     Event:
-      $ref: './components/schemas/Event.yaml'
+      $ref: ./components/schemas/Event.yaml
     TicketType:
-      $ref: './components/schemas/TicketType.yaml'
+      $ref: ./components/schemas/TicketType.yaml
     EventType:
-      $ref: './components/schemas/EventType.yaml'
+      $ref: ./components/schemas/EventType.yaml
     ErrorResponse:
-      $ref: './components/schemas/ErrorResponse.yaml'
-
+      $ref: ./components/schemas/ErrorResponse.yaml
   parameters:
     ticket:
       name: ticket
@@ -445,16 +677,28 @@ components:
             $ref: '#/components/schemas/Ticket'
           example:
             name: Билет в партер
-            coordinates: {x: 10.5, y: 20}
+            coordinates:
+              x: 10.5
+              'y': 20
             price: 2500.5
             comment: Место рядом со сценой
             type: VIP
             event: null
     page:
-      $ref: './components/parameters/Pagination.yaml#/page'
+      $ref: ./components/parameters/Pagination.yaml#/page
     size:
-      $ref: './components/parameters/Pagination.yaml#/size'
+      $ref: ./components/parameters/Pagination.yaml#/size
     sort:
-      $ref: './components/parameters/Pagination.yaml#/sort'
+      $ref: ./components/parameters/Pagination.yaml#/sort
     filter:
-      $ref: './components/parameters/Pagination.yaml#/filter'
+      $ref: ./components/parameters/Pagination.yaml#/filter
+    ifNoneMatch:
+      name: If-None-Match
+      in: header
+      required: false
+      description: >-
+        Тег из ETag предыдущего ответа, список тегов через запятую или *. При совпадении с текущим
+        представлением возвращается 304 без тела; если билет отсутствует — 404.
+      schema:
+        type: string
+      example: '"ticket-10-v1"'

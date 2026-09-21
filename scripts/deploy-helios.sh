@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-# Загружается только документация; исходники проекта и node_modules не публикуются.
 npm run check
 remote='s409792@helios.se.ifmo.ru'
 ssh -p 2222 "$remote" 'mkdir -p ~/public_html/soa-lab-1 && chmod 755 ~/public_html ~/public_html/soa-lab-1'

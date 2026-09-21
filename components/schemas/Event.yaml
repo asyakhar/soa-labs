@@ -3,26 +3,27 @@ nullable: true
 description: Мероприятие, для которого предназначен билет
 properties:
   id:
-    type: integer 
-    format: int64 
+    type: integer
+    format: int64
     minimum: 1
     readOnly: true
     description: Уникальный автоматически генерируемый идентификатор мероприятия, должен быть >0
+    example: 7
   name:
-    type: string 
+    type: string
     minLength: 1
     description: Название мероприятия. Строка не может быть пустой
+    example: Вечер оперы
   ticketsCount:
     type: integer
     format: int32
     minimum: 1
     description: Количество билетов. Значение должно быть больше 0
+    example: 120
   eventType:
-    $ref: './EventType.yaml'
-required: 
+    $ref: ./EventType.yaml
+required:
   - id
   - name
   - ticketsCount
-
-
-
+title: Мероприятие
