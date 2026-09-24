@@ -35,6 +35,7 @@ properties:
     example: 2500.5
   comment:
     type: string
+    maxLength: 341
     description: Комментарий к билету. Поле не может быть null
     example: Место рядом со сценой
   type:

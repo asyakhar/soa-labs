@@ -7,6 +7,7 @@ const assert = require('node:assert/strict');
   assert.equal(operations.length, 11);
   assert.equal(Object.keys(api.components.schemas).length, 6);
   assert(operations.every(op => !op.requestBody), 'Все входные данные должны быть в URL');
+  assert.equal(api.components.schemas.Ticket.properties.comment.maxLength, 341);
   assert.notEqual(api.components.schemas.TicketType.nullable, true);
   assert(api.components.schemas.EventType.enum.includes(null));
   for (const name of ['/sell/{ticket-id}/{person-id}/{price}', '/person/{person-id}/cancel']) {
