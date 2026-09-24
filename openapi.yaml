@@ -43,10 +43,8 @@ paths:
                   $ref: '#/components/schemas/Ticket'
         '422':
           description: >-
-            page должен быть целым int32 ≥ 0, size — целым от 1 до 100. Поле sort/filter должно
-            входить в перечисленные поля Ticket; направление sort — asc или desc, оператор filter
-            должен поддерживать тип поля, значение — соответствовать его типу. Нарушение любого из
-            этих условий возвращает 422.
+            page должен быть ≥ 0, size — от 1 до 100; sort и filter должны содержать поддерживаемые
+            поля, направления и операторы.
           content:
             application/json:
               schema:
@@ -105,12 +103,8 @@ paths:
                       скобка.
         '422':
           description: >-
-            Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует
-            или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤
-            0; comment отсутствует или равен null или длиннее 341 символа; type не входит в VIP, USUAL,
-            BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст,
-            ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы
-            всех полей должны соответствовать схеме; генерируемые поля передавать нельзя.
+            Обязательные поля Ticket отсутствуют либо нарушены их типы, диапазоны, значения enum или
+            максимальная длина comment.
           content:
             application/json:
               schema:
@@ -195,9 +189,7 @@ paths:
                 message: Билет с id 10 не найден.
                 path: /api/v1/tickets/10
         '422':
-          description: >-
-            Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное,
-            неположительное значение или число за пределами int64.
+          description: Параметр id должен быть целым числом int64 больше 0.
           content:
             application/json:
               schema:
@@ -268,14 +260,8 @@ paths:
                 path: /api/v1/tickets/10
         '422':
           description: >-
-            Нарушена схема Ticket: name отсутствует, равен null или пуст; coordinates отсутствует
-            или равен null; x не число или ≤ -239; y не целое int64 или ≤ -495; price не число или ≤
-            0; comment отсутствует, равен null или длиннее 341 символа; type не входит в VIP, USUAL,
-            BUDGETARY, CHEAP или равен null. Если event задан: name обязателен и непуст,
-            ticketsCount — целое int32 > 0, eventType — CONCERT, BASKETBALL, OPERA или null. Типы
-            всех полей должны соответствовать схеме; генерируемые поля передавать нельзя. Параметр
-            id должен быть целым числом int64 больше 0; передано буквенное, дробное, неположительное
-            значение или число за пределами int64.
+            id должен быть целым int64 больше 0, а поля Ticket должны соответствовать ограничениям
+            схемы.
           content:
             application/json:
               schema:
@@ -303,9 +289,7 @@ paths:
             Билет отсутствует в коллекции: удалён этим запросом или отсутствовал до запроса. Тело
             ответа отсутствует.
         '422':
-          description: >-
-            Параметр id должен быть целым числом int64 больше 0; передано буквенное, дробное,
-            неположительное значение или число за пределами int64.
+          description: Параметр id должен быть целым числом int64 больше 0.
           content:
             application/json:
               schema:
@@ -381,7 +365,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ticket'
         '422':
-          description: Обязательный query-параметр substring отсутствует или содержит строку длиной 0.
+          description: Параметр substring отсутствует или является пустой строкой.
           content:
             application/json:
               schema:
@@ -422,9 +406,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ticket'
         '422':
-          description: >-
-            Обязательный query-параметр type отсутствует либо отличается от VIP, USUAL, BUDGETARY и
-            CHEAP. Сравнение учитывает регистр.
+          description: Параметр type отсутствует или не равен VIP, USUAL, BUDGETARY либо CHEAP.
           content:
             application/json:
               schema:
@@ -510,8 +492,7 @@ paths:
                 path: /booking/sell/10/42/100
         '422':
           description: >-
-            ticket-id и person-id должны быть целыми int64 > 0; price должен быть конечным числом >
-            0 с точкой в качестве десятичного разделителя.
+            ticket-id и person-id должны быть целыми int64 больше 0, price — числом больше 0.
           content:
             application/json:
               schema:
@@ -564,7 +545,7 @@ paths:
         '204':
           description: Все бронирования человека успешно отменены
         '422':
-          description: person-id должен быть целым числом int64 больше 0.
+          description: Параметр person-id должен быть целым числом int64 больше 0.
           content:
             application/json:
               schema:
