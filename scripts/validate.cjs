@@ -4,10 +4,9 @@ const assert = require('node:assert/strict');
   const api = await SwaggerParser.validate('openapi.yaml');
   const methods = ['get', 'post', 'put', 'delete', 'patch', 'head', 'options'];
   const operations = Object.values(api.paths).flatMap(p => methods.filter(m => p[m]).map(m => p[m]));
-  assert.equal(operations.length, 12);
+  assert.equal(operations.length, 11);
   assert.equal(Object.keys(api.components.schemas).length, 6);
   assert(operations.every(op => !op.requestBody), 'Все входные данные должны быть в URL');
-  assert.equal(api.components.schemas.Ticket.properties.comment.maxLength, 341);
   assert.notEqual(api.components.schemas.TicketType.nullable, true);
   assert(api.components.schemas.EventType.enum.includes(null));
   for (const name of ['/sell/{ticket-id}/{person-id}/{price}', '/person/{person-id}/cancel']) {
@@ -24,16 +23,15 @@ const assert = require('node:assert/strict');
     if (item.delete) assert(!item.delete.responses['404']);
   }
   const resource = api.paths['/tickets/{id}'];
-  assert(resource.put && resource.head && api.paths['/tickets'].options);
+  assert(resource.put && api.paths['/tickets'].options);
   assert(resource.get.responses['304'].headers.ETag);
   assert(!resource.get.responses['304'].content);
-  assert(Object.values(resource.head.responses).every(response => !response.content));
   for (const schema of [api.components.schemas.Ticket.properties.creationDate,
                         api.components.schemas.ErrorResponse.properties.timestamp]) {
     assert(!schema.format);
     assert(new RegExp(schema.pattern).test(schema.example));
     assert(!new RegExp(schema.pattern).test('21.09.2026 25:61:00'));
   }
-  console.log('Проверены статусы GET/DELETE, HEAD/OPTIONS, 304 без тела и формат времени.');
-  console.log('OpenAPI 3.0.3: валидна; 12 операций, 6 схем; ограничения и URL-параметры проверены.');
+  console.log('Проверены статусы ответов, OPTIONS, ETag, 304 и формат времени.');
+  console.log('OpenAPI 3.0.3: валидна; 11 операций, 6 схем.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

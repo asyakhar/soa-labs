@@ -23,21 +23,11 @@ sort:
   name: sort
   in: query
   description: |
-    Один критерий имеет формат `поле,asc` или `поле,desc` (направление обязательно).
-    Несколько критериев передаются повторением параметра:
-    `?sort=price,desc&sort=name,asc`. Приоритет соответствует порядку параметров.
-    Поддерживаются все поля Ticket: id, name, coordinates, creationDate, price,
-    comment, type, event; вложенные поля задаются через точку:
-    coordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.
-    coordinates сравнивается по (x, y), event — по (id, name, ticketsCount, eventType).
-    Числа сравниваются численно, строки — по Unicode с учётом регистра,
-    creationDate — хронологически. Перечисления сравниваются в порядке объявления:
-    VIP < USUAL < BUDGETARY < CHEAP; CONCERT < BASKETBALL < OPERA.
-    null и отсутствующие необязательные поля всегда идут последними.
-    Без sort используется id,asc; при равенстве критериев id,asc служит последним
-    критерием для устойчивой пагинации при неизменной коллекции.
-    Неизвестное поле, неверное направление или повтор одного поля — HTTP 422.
-    Примеры здесь показаны до percent-encoding URL.
+    Сортировка задаётся в формате `поле,направление`, где направление —
+    `asc` или `desc`. Для сортировки по нескольким полям параметр
+    передаётся несколько раз: `?sort=price,desc&sort=name,asc`.
+    Вложенные поля записываются через точку, например `coordinates.x`
+    или `event.name`.
   required: false
   style: form
   explode: true
@@ -55,29 +45,11 @@ filter:
   in: query
   required: false
   description: |
-    Условие имеет формат `поле:оператор:значение`. Первые два двоеточия — разделители;
-    оставшаяся часть целиком является значением (включая двоеточия в дате или тексте).
-    Несколько условий передаются повторением filter и объединяются через AND:
-    `?filter=price:gte:100&filter=price:lt:500&filter=event.eventType:eq:CONCERT`.
-    Можно повторять одно поле и сочетать filter с любыми sort, page и size.
-    Поля: id, name, coordinates, creationDate, price, comment, type, event,
-    coordinates.x, coordinates.y, event.id, event.name, event.ticketsCount, event.eventType.
-    Операторы eq, ne доступны для всех полей; gt, gte, lt, lte — для чисел,
-    creationDate и перечислений; contains — для name, comment и event.name;
-    isnull — для event и event.eventType, значение true или false.
-    Примеры: `filter=comment:contains:сцена`, `filter=event:isnull:true`,
-    `filter=creationDate:gte:01.09.2026 00:00:00`.
-    Числа записываются с точкой, даты — локальные dd.MM.yyyy HH:mm:ss с необязательными долями секунды, без часового пояса,
-    enum — одним из объявленных имён; порядок enum такой же, как для sort.
-    Строки сравниваются с учётом регистра, contains ищет буквальную подстроку.
-    Для coordinates и event операторы eq/ne принимают JSON-объект и сравнивают
-    его структурно со всем объектом; для event также допустим JSON null.
-    Для event.eventType допустимо значение null с eq/ne.
-    Отсутствующее event считается null; вложенные поля отсутствующего event также null.
-    Сравнения с null, кроме eq/ne/isnull, дают false.
-    Значения кодируются percent-encoding при передаче в URL; строка после второго
-    двоеточия не обрезается. Неизвестное поле, оператор, несовместимый тип значения
-    или некорректный синтаксис приводят к HTTP 422. Нет совпадений — HTTP 200 и [].
+    Условие задаётся в формате `поле:оператор:значение`.
+    Несколько параметров filter объединяются операцией AND.
+    Поддерживаются операторы `eq`, `ne`, `gt`, `gte`, `lt`, `lte`,
+    `contains` и `isnull`. Вложенные поля записываются через точку.
+    Пример: `?filter=price:gte:100&filter=type:eq:VIP`.
   style: form
   explode: true
   schema:
