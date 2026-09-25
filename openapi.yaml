@@ -3,7 +3,7 @@ info:
   title: Сервис управления и продажи билетов
   description: |
     Спецификация сервиса управления билетами и сервиса бронирования.
-    Все параметры операций передаются в URL. В POST и PUT данные Ticket
+    Все параметры операций передаются в URL. В POST, PUT и PATCH данные Ticket
     передаются в query-параметре `ticket` как JSON.
     Поля id, creationDate и event.id генерируются сервером.
   version: 1.0.0
@@ -43,8 +43,8 @@ paths:
                   $ref: '#/components/schemas/Ticket'
         '422':
           description: >-
-            page должен быть ≥ 0, size — от 1 до 100; sort и filter должны содержать поддерживаемые
-            поля, направления и операторы.
+            page и size должны быть целыми числами в допустимых диапазонах; sort и filter должны
+            содержать поддерживаемые поля, направления и операторы.
           content:
             application/json:
               schema:
@@ -81,9 +81,8 @@ paths:
                 $ref: '#/components/schemas/Ticket'
         '400':
           description: >-
-            Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует
-            закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую
-            последовательность percent-encoding. Разбор запроса прекращён до проверки модели.
+            Сервер не смог разобрать запрос: обязательный query-параметр ticket отсутствует,
+            содержит некорректное percent-encoding или не является синтаксически корректным JSON.
           content:
             application/json:
               schema:
@@ -103,7 +102,7 @@ paths:
                       скобка.
         '422':
           description: >-
-            Обязательные поля Ticket отсутствуют либо нарушены их типы, диапазоны, значения enum или
+            Обязательные поля Ticket нарушены их типы, диапазоны, значения enum или
             максимальная длина comment.
           content:
             application/json:
@@ -177,7 +176,7 @@ paths:
                 type: string
               example: '"ticket-10-v1"'
         '404':
-          description: Билет с переданным положительным id отсутствует в коллекции.
+          description: В коллекции билетов отсутствует билет с указанным идентификатором.
           content:
             application/json:
               schema:
@@ -226,9 +225,9 @@ paths:
                 $ref: '#/components/schemas/Ticket'
         '400':
           description: >-
-            Параметр ticket отсутствует, содержит незавершённый JSON-текст (например, отсутствует
-            закрывающая фигурная скобка), имя свойства без двойных кавычек либо недопустимую
-            последовательность percent-encoding. Разбор запроса прекращён до проверки модели.
+            Сервер не смог разобрать запрос: path-параметр id невозможно преобразовать в int64 либо
+            обязательный query-параметр ticket отсутствует, содержит некорректное percent-encoding
+            или не является синтаксически корректным JSON.
           content:
             application/json:
               schema:
@@ -240,14 +239,14 @@ paths:
                 message: >-
                   В значении ticket после последнего свойства отсутствует закрывающая фигурная
                   скобка.
-                path: /api/v1/tickets
+                path: /api/v1/tickets/10
                 violations:
                   - field: ticket
                     message: >-
                       В значении ticket после последнего свойства отсутствует закрывающая фигурная
                       скобка.
         '404':
-          description: Билет с переданным положительным id отсутствует в коллекции.
+          description: В коллекции билетов отсутствует билет с указанным идентификатором.
           content:
             application/json:
               schema:
@@ -275,6 +274,70 @@ paths:
                 violations:
                   - field: ticket.price
                     message: price должен быть числом больше 0; получено -10.
+    patch:
+      tags:
+        - Tickets
+      summary: Частично обновить билет
+      description: >-
+        Обновляет только переданные поля билета. Остальные поля сохраняют прежние значения. Поля id,
+        creationDate и event.id изменять нельзя.
+      operationId: patchTicket
+      parameters:
+        - $ref: '#/components/parameters/ticketPatch'
+      responses:
+        '200':
+          description: Билет успешно частично обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ticket'
+        '400':
+          description: >-
+            Сервер не смог разобрать запрос: path-параметр id невозможно преобразовать в int64 либо
+            обязательный query-параметр ticket отсутствует, содержит некорректное percent-encoding
+            или не является синтаксически корректным JSON.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: Параметр ticket содержит неразбираемый JSON.
+                path: /api/v1/tickets/10
+                violations:
+                  - field: ticket
+                    message: Параметр ticket содержит неразбираемый JSON.
+        '404':
+          description: В коллекции билетов отсутствует билет с указанным идентификатором.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 404
+                error: Not Found
+                message: Билет с id 10 не найден.
+                path: /api/v1/tickets/10
+        '422':
+          description: >-
+            id должен быть целым int64 больше 0, а переданные поля должны соответствовать схеме
+            TicketPatch.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 422
+                error: Unprocessable Content
+                message: price должен быть числом больше 0; получено -10.
+                path: /api/v1/tickets/10
+                violations:
+                  - field: ticket.price
+                    message: price должен быть числом больше 0; получено -10.
     delete:
       tags:
         - Tickets
@@ -288,6 +351,23 @@ paths:
           description: >-
             Билет отсутствует в коллекции: удалён этим запросом или отсутствовал до запроса. Тело
             ответа отсутствует.
+        '400':
+          description: >-
+            Сервер не смог разобрать запрос: path-параметр id невозможно преобразовать в int64,
+            например, передано буквенное или дробное значение либо число за пределами int64.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: Параметр id невозможно преобразовать в int64; получено abc.
+                path: /api/v1/tickets/abc
+                violations:
+                  - field: id
+                    message: Параметр id невозможно преобразовать в int64; получено abc.
         '422':
           description: Параметр id должен быть целым числом int64 больше 0.
           content:
@@ -326,7 +406,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Ticket'
         '404':
-          description: В коллекции нет ни одного билета; объект с максимальным type выбрать невозможно.
+          description: Коллекция билетов пуста, поэтому определить билет с максимальным type невозможно.
           content:
             application/json:
               schema:
@@ -365,7 +445,7 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ticket'
         '422':
-          description: Параметр substring отсутствует или является пустой строкой.
+          description: Обязательный параметр substring отсутствует или является пустой строкой.
           content:
             application/json:
               schema:
@@ -406,7 +486,8 @@ paths:
                 items:
                   $ref: '#/components/schemas/Ticket'
         '422':
-          description: Параметр type отсутствует или не равен VIP, USUAL, BUDGETARY либо CHEAP.
+          description: >-
+            Обязательный параметр type отсутствует или не равен VIP, USUAL, BUDGETARY либо CHEAP.
           content:
             application/json:
               schema:
@@ -464,8 +545,25 @@ paths:
       responses:
         '204':
           description: Билет успешно продан
+        '400':
+          description: >-
+            Сервер не смог разобрать запрос: ticket-id или person-id невозможно преобразовать в
+            int64 либо price невозможно преобразовать в число double.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: Параметр price невозможно преобразовать в double; получено abc.
+                path: /booking/sell/10/42/abc
+                violations:
+                  - field: price
+                    message: Параметр price невозможно преобразовать в double; получено abc.
         '404':
-          description: Билет с переданным положительным id отсутствует в коллекции.
+          description: В коллекции билетов отсутствует билет с указанным идентификатором.
           content:
             application/json:
               schema:
@@ -506,20 +604,6 @@ paths:
                 violations:
                   - field: price
                     message: price должен быть больше 0; получено 0.
-        '502':
-          description: >-
-            Не удалось установить соединение с первым сервисом либо его ответ не соответствует
-            ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                timestamp: 21.09.2026 14:30:00
-                status: 502
-                error: Bad Gateway
-                message: Сервис коллекции билетов не установил соединение.
-                path: /booking/sell/{ticket-id}/{person-id}/{price}
   /person/{person-id}/cancel:
     servers:
       - url: /booking
@@ -544,6 +628,23 @@ paths:
       responses:
         '204':
           description: Все бронирования человека успешно отменены
+        '400':
+          description: >-
+            Сервер не смог разобрать запрос: path-параметр person-id невозможно преобразовать в
+            int64, например, передано буквенное или дробное значение либо число за пределами int64.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                timestamp: 21.09.2026 14:30:00
+                status: 400
+                error: Bad Request
+                message: Параметр person-id невозможно преобразовать в int64; получено abc.
+                path: /booking/person/abc/cancel
+                violations:
+                  - field: person-id
+                    message: Параметр person-id невозможно преобразовать в int64; получено abc.
         '422':
           description: Параметр person-id должен быть целым числом int64 больше 0.
           content:
@@ -559,24 +660,12 @@ paths:
                 violations:
                   - field: person-id
                     message: person-id должен быть целым числом больше 0; получено -1.
-        '502':
-          description: >-
-            Не удалось установить соединение с первым сервисом либо его ответ не соответствует
-            ожидаемому статусу или схеме Ticket. Изменения связей бронирования не сохраняются.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                timestamp: 21.09.2026 14:30:00
-                status: 502
-                error: Bad Gateway
-                message: Сервис коллекции билетов не установил соединение.
-                path: /booking/person/{person-id}/cancel
 components:
   schemas:
     Ticket:
       $ref: ./components/schemas/Ticket.yaml
+    TicketPatch:
+      $ref: ./components/schemas/TicketPatch.yaml
     Coordinates:
       $ref: ./components/schemas/Coordinates.yaml
     Event:
@@ -610,6 +699,20 @@ components:
             comment: Место рядом со сценой
             type: VIP
             event: null
+    ticketPatch:
+      name: ticket
+      in: query
+      required: true
+      description: |
+        JSON-объект с полями Ticket, которые требуется изменить, закодированный в URL.
+        Необходимо передать хотя бы одно поле. id, creationDate и event.id изменять нельзя.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TicketPatch'
+          example:
+            price: 3000
+            comment: Новое место
     page:
       $ref: ./components/parameters/Pagination.yaml#/page
     size:

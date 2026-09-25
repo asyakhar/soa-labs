@@ -1,0 +1,29 @@
+type: object
+title: Частичное обновление билета
+description: Поля билета, которые требуется изменить
+minProperties: 1
+additionalProperties: false
+properties:
+  name:
+    type: string
+    minLength: 1
+    description: Новое название билета. Строка не может быть пустой
+    example: Билет в амфитеатр
+  coordinates:
+    $ref: ./Coordinates.yaml
+  price:
+    type: number
+    format: double
+    minimum: 0
+    exclusiveMinimum: true
+    description: Новая цена билета. Значение должно быть больше 0
+    example: 3000
+  comment:
+    type: string
+    maxLength: 341
+    description: Новый комментарий. Длина не должна превышать 341 символ
+    example: Новое место
+  type:
+    $ref: ./TicketType.yaml
+  event:
+    $ref: ./Event.yaml
